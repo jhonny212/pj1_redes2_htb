@@ -20,11 +20,11 @@ void create0();
 void create1();
 void create2();
 void create3();
-void modalidad1();
-void modalidad2();
+void modalidad();
+void escribir_horario();
 
 FILE * archivo;
-
+string modo_;
 
 long medida;
 char * textoenlace;
@@ -38,12 +38,13 @@ int upband=0;
 int downband=0;
 int main()
 {
+    modo_="";
     id=0;
     counter=0;
     create0();
     create1();
     create2();
-    modalidad1();
+    modalidad();
     return 0;
 }
 
@@ -70,7 +71,7 @@ void create0(){
 void create1(){
     abrir();
     vector<string> modo=split(textomodo,'=',false);
-
+    modo_=modo[1];
 }
 
 //crear array de usuario
@@ -171,32 +172,29 @@ vector<string> split(string str, char pattern,bool enter) {
 }
 
 
-void modalidad1(){
-    //eliminar enlaces	
-    system("/usr/sbin/tc qdisc del dev enp7s0 root");
-    system("sudo insmod sch_htb 2> /dev/null");
+void modalidad(){
+    //eliminar enlaces
+    //system("/usr/sbin/tc qdisc del dev enp7s0 root");
+    //system("sudo insmod sch_htb 2> /dev/null");
     //crear raiz
-    system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
-
+    //system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
+    string archivocrontab="";
     for(int i=0; i<usuario.size(); i++){
         vector<string>tmp=usuario[i];
         vector<string>mac=split(tmp[0],':',false);
         //crear enlaces id
         string command="/usr/sbin/tc class add dev enp7s0 parent 1:1 classid 1:"+to_string(i+1);
         if(tmp.size()!=5){break; }
-      
-        for(int j=0; j<tmp.size(); j++){
-        	cout<<tmp[j]<<endl;
-        }
+
+
         string strdown=tmp[1];
-        
         string strup=tmp[2];
         int intup=(stoi(strup)*10)*upband;
         int intdown=(stoi(strdown)*10)*downband;
-       
-        command=command+" htb rate "+to_string(intdown)+"kbit";
+        int intdefault=0;
+        command=command+" htb rate "+to_string(intdefault)+"kbit";
         //crear reglase del enlace
-        system(command.c_str());
+        //system(command.c_str());
         string M2= mac[4]+mac[5];
         string M0= mac[0]+mac[1];
         string M1= mac[2]+mac[3];
@@ -207,8 +205,18 @@ void modalidad1(){
         string filter_by_mac2=TCF+" match u32 0x"+M1+M2+" 0xFFFFFFFF at -12 match u16 0x"+M0;
         filter_by_mac2=filter_by_mac2+" 0xFFFF at -14 flowid 1:"+to_string(i+1);
        //asignar por mac
-        system(filter_by_mac1.c_str());
-        system(filter_by_mac2.c_str());
-        
+        //system(filter_by_mac1.c_str());
+        //system(filter_by_mac2.c_str());
+        vector<string> init=split(tmp[3],':',false);
+        archivocrontab=archivocrontab+init[1]+" "+init[0]+" * * * /sbin/tc class change dev";
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdown)+"kbit \n";
+        vector<string> end=split(tmp[4],':',false);
+        archivocrontab=archivocrontab+end[1]+" "+end[0]+" * * * /sbin/tc class change dev";
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdefault)+"kbit \n";
+
+
     }
+    cout<<archivocrontab<<endl;
+
 }
+//string path_crontab="/tmp/crontab.40Hf9i/";
