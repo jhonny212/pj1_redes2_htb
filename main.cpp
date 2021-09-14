@@ -57,6 +57,7 @@ void create0(){
 
     for(int i=0; i<enlace.size(); i++){
         vector<string>tmp=enlace[i];
+         if(tmp.size()!=2){break; }
         if(tmp[0]=="up"){
             upband=stoi(tmp[1]);
         }else if(tmp[0]=="down"){
@@ -80,19 +81,6 @@ void create2(){
 
         usuario.push_back(split(res[i],',',false));
     }
-
-    /*for(int i=0; i<usuario.size(); i++){
-        vector<string>tmp=usuario[i];
-        //vector<string>mac=split(tmp[0],':',false);
-        for(int k=0;k<mac.size();k++){
-                cout<<mac[k];
-        }
-        for (int j=1; j<tmp.size();j++){
-
-            cout<<tmp[j]<<"**"<<endl;
-        }
-    }*/
-
 }
 
 //crear array de protocolo
@@ -156,6 +144,7 @@ void abrir(){
     counter=counter+1;
 }
 
+//metodo para split
 vector<string> split(string str, char pattern,bool enter) {
     int posInit = 0;
     int posFound = 0;
@@ -183,31 +172,43 @@ vector<string> split(string str, char pattern,bool enter) {
 
 
 void modalidad1(){
-
-    //system("tc qdisc del dev interfaz root ");
-    //system("insmod sch_htb 2> /dev/null ");
-    //system("tc qdisc add dev $DEV root       handle 1:    htb default 0xA");
+    //eliminar enlaces	
+    system("/usr/sbin/tc qdisc del dev enp7s0 root");
+    system("sudo insmod sch_htb 2> /dev/null");
+    //crear raiz
+    system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
 
     for(int i=0; i<usuario.size(); i++){
         vector<string>tmp=usuario[i];
         vector<string>mac=split(tmp[0],':',false);
-        string command="tc class add dev enp7s0 parent 1:1 classid 1:"+to_string(i+1);
+        //crear enlaces id
+        string command="/usr/sbin/tc class add dev enp7s0 parent 1:1 classid 1:"+to_string(i+1);
+        if(tmp.size()!=5){break; }
+      
+        for(int j=0; j<tmp.size(); j++){
+        	cout<<tmp[j]<<endl;
+        }
         string strdown=tmp[1];
+        
         string strup=tmp[2];
         int intup=(stoi(strup)*10)*upband;
         int intdown=(stoi(strdown)*10)*downband;
-        cout<<intup<<"->"<<intdown<<endl;
+       
         command=command+" htb rate "+to_string(intdown)+"kbit";
+        //crear reglase del enlace
+        system(command.c_str());
         string M2= mac[4]+mac[5];
         string M0= mac[0]+mac[1];
         string M1= mac[2]+mac[3];
+	    string TCF="/usr/sbin/tc filter add dev enp7s0 parent 1: protocol ip prio 5 u32 match u16 0x0800 0xFFFF at -2";
+        string filter_by_mac1=TCF+" match u16 0x"+M2+" 0xFFFF at -4 match u32 0x"+M0+M1;
+        filter_by_mac1=filter_by_mac1+" 0xFFFFFFFF at -8 flowid 1:"+to_string(i+1);
 
-        string filter_by_mac1="tc match u16 0x"+M2+" 0xFFFF at -4 match u32 0x"+M0+M1;
-        filter_by_mac1=filter_by_mac1+"  0xFFFFFFFF at -8 flowid 1:"+to_string(i+1);
-
-        string filter_by_mac2="tc match u32 0x"+M1+M2+" 0xFFFFFFFF at -12 match u16 0x"+M0;
+        string filter_by_mac2=TCF+" match u32 0x"+M1+M2+" 0xFFFFFFFF at -12 match u16 0x"+M0;
         filter_by_mac2=filter_by_mac2+" 0xFFFF at -14 flowid 1:"+to_string(i+1);
-        //system(filter_by_mac1.c_str());
-        //system(filter_by_mac2.c_str());
+       //asignar por mac
+        system(filter_by_mac1.c_str());
+        system(filter_by_mac2.c_str());
+        
     }
 }
