@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <fstream>
+
 using namespace std;
 vector<string> split(string str, char pattern, bool enter);
 vector<vector<string>> enlace;
@@ -216,7 +217,11 @@ void modalidad(){
 
 
     }
-    cout<<archivocrontab<<endl;
+    ofstream file;
+    file.open("/home/isma/Escritorio/8VO. SEMESTRE/LAB.REDES2/Pj1/redes/archivoprueba.txt");
+    file << archivocrontab.c_str();
+    //system("sudo crontab archivocontrab");
+    //system("");
 
 }
 //string path_crontab="/tmp/crontab.40Hf9i/";
