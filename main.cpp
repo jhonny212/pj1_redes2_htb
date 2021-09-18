@@ -6,7 +6,6 @@
 #include <vector>
 #include <algorithm>
 #include <fstream>
-
 using namespace std;
 vector<string> split(string str, char pattern, bool enter);
 vector<vector<string>> enlace;
@@ -14,18 +13,19 @@ vector<vector<string>> modo;
 vector<vector<string>> proto;
 vector<vector<string>> usuario;
 vector<vector<string>> macusuario;
-
+bool isdinamic;
 
 void abrir();
 void create0();
 void create1();
 void create2();
 void create3();
-void modalidad();
-void escribir_horario();
+void modalidad1();
+void modalidad2();
+void protocolos();
 
 FILE * archivo;
-string modo_;
+
 
 long medida;
 char * textoenlace;
@@ -39,13 +39,17 @@ int upband=0;
 int downband=0;
 int main()
 {
-    modo_="";
+    //	
+  
+    isdinamic=false;
     id=0;
     counter=0;
     create0();
     create1();
     create2();
-    modalidad();
+    create3();
+    modalidad1();
+    protocolos();
     return 0;
 }
 
@@ -66,13 +70,27 @@ void create0(){
             downband=stoi(tmp[1]);
         }
     }
+    cout<<"velocidad de subida:"<<upband<<endl;
+    cout<<"velocidad de bajada:"<<downband<<endl;
+    
+    
 }
 
 //crear array de modo
 void create1(){
     abrir();
+    vector<string> res=split(textomodo,'\n',false);
     vector<string> modo=split(textomodo,'=',false);
-    modo_=modo[1];
+    if (modo[1]=="1\n") {
+    	isdinamic=true;
+    	
+    }
+    if (modo[1]=="1") {
+    	isdinamic=true;
+    	
+    }
+    cout<<"es dinamico:"<<isdinamic<<endl;
+
 }
 
 //crear array de usuario
@@ -80,22 +98,18 @@ void create2(){
     abrir();
     vector<string> res=split(textousuario,'\n',false);
     for(int i=0; i<res.size(); i++){
-
         usuario.push_back(split(res[i],',',false));
     }
+
+
 }
 
 //crear array de protocolo
 void create3(){
     abrir();
-    vector<string> res=split(textoproto,',',false);
+    vector<string> res=split(textoproto,'\n',false);
     for(int i=0; i<res.size(); i++){
-        proto.push_back(split(res[i],'=',false));
-    }
-
-    for(int i=0; i<proto.size(); i++){
-        vector<string>tmp=proto[i];
-        cout<<tmp[0]<<endl;
+        proto.push_back(split(res[i],',',false));
     }
 
 }
@@ -146,7 +160,6 @@ void abrir(){
     counter=counter+1;
 }
 
-//metodo para split
 vector<string> split(string str, char pattern,bool enter) {
     int posInit = 0;
     int posFound = 0;
@@ -173,12 +186,14 @@ vector<string> split(string str, char pattern,bool enter) {
 }
 
 
-void modalidad(){
-    //eliminar enlaces
+void modalidad1(){
+    //eliminar enlaces	
+    
     //system("/usr/sbin/tc qdisc del dev enp7s0 root");
-    //system("sudo insmod sch_htb 2> /dev/null");
+    
+    system("sudo insmod sch_htb 2> /dev/null");
     //crear raiz
-    //system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
+    system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
     string archivocrontab="";
     for(int i=0; i<usuario.size(); i++){
         vector<string>tmp=usuario[i];
@@ -186,42 +201,88 @@ void modalidad(){
         //crear enlaces id
         string command="/usr/sbin/tc class add dev enp7s0 parent 1:1 classid 1:"+to_string(i+1);
         if(tmp.size()!=5){break; }
-
-
+      
+        
         string strdown=tmp[1];
+        
         string strup=tmp[2];
-        int intup=(stoi(strup)*10)*upband;
-        int intdown=(stoi(strdown)*10)*downband;
-        int intdefault=0;
-        command=command+" htb rate "+to_string(intdefault)+"kbit";
+        int intup=(stoi(strup)*(10.24))*upband;
+        int intdown=(stoi(strdown)*(10.24))*(downband);
+        intdown=intdown+intup;
+        int intdefault=1;
+        
+        cout<<"ancho de banda a asignar a la mac "<<tmp[0]<<" "<<intdown<<endl;
+        command=command+" htb rate "+to_string(intdefault)+"kbit ceil "+to_string(intdefault)+"kbit";
+        
         //crear reglase del enlace
-        //system(command.c_str());
+        system(command.c_str());
         string M2= mac[4]+mac[5];
         string M0= mac[0]+mac[1];
         string M1= mac[2]+mac[3];
-	    string TCF="/usr/sbin/tc filter add dev enp7s0 parent 1: protocol ip prio 5 u32 match u16 0x0800 0xFFFF at -2";
+	string TCF="/usr/sbin/tc filter add dev enp7s0 parent 1: protocol ip prio 5 u32 match u16 0x0800 0xFFFF at -2";
         string filter_by_mac1=TCF+" match u16 0x"+M2+" 0xFFFF at -4 match u32 0x"+M0+M1;
         filter_by_mac1=filter_by_mac1+" 0xFFFFFFFF at -8 flowid 1:"+to_string(i+1);
 
         string filter_by_mac2=TCF+" match u32 0x"+M1+M2+" 0xFFFFFFFF at -12 match u16 0x"+M0;
         filter_by_mac2=filter_by_mac2+" 0xFFFF at -14 flowid 1:"+to_string(i+1);
        //asignar por mac
-        //system(filter_by_mac1.c_str());
-        //system(filter_by_mac2.c_str());
+        system(filter_by_mac1.c_str());
+        system(filter_by_mac2.c_str());
+        ///////
         vector<string> init=split(tmp[3],':',false);
+        cout<<"Hora inicio: "<<init[0]<<":"<<init[1];
         archivocrontab=archivocrontab+init[1]+" "+init[0]+" * * * /sbin/tc class change dev";
+        if(isdinamic){
         archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdown)+"kbit \n";
+        }else{
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdown)+"kbit ceil "+to_string(intdown)+"kbit\n";
+        }
+        
         vector<string> end=split(tmp[4],':',false);
+        cout<<" Hora fin: "<<end[0]<<":"<<end[1]<<endl;
         archivocrontab=archivocrontab+end[1]+" "+end[0]+" * * * /sbin/tc class change dev";
-        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdefault)+"kbit \n";
-
-
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdefault)+"kbit ceil "+to_string(intdefault)+"kbit\n";
+        
     }
+    system("crontab /home/jhonny/Desktop/archivocontrab");
     ofstream file;
-    file.open("/home/isma/Escritorio/8VO. SEMESTRE/LAB.REDES2/Pj1/redes/archivoprueba.txt");
+    file.open("/home/jhonny/Desktop/archivocontrab");
     file << archivocrontab.c_str();
-    //system("sudo crontab archivocontrab");
-    //system("");
-
+    file.close();
+    system("sudo crontab -u root /home/jhonny/Desktop/archivocontrab");
 }
-//string path_crontab="/tmp/crontab.40Hf9i/";
+
+void protocolos() {
+    for(int i=0; i<proto.size(); i++){
+        vector<string>tmp=proto[i];
+        
+    	if(tmp.size()!=5){break; }
+    	string time=" -m time --timestart "+tmp[3]+" --timestop "+tmp[4]+"";
+        string command="";
+        cout<<"Aplicando protocolo a "<<tmp[0]<<endl;
+    	if(tmp[1]=="udp"){
+    	command="sudo iptables -I FORWARD 1 -p udp -m mac --mac-source "+tmp[0]+" -m udp --dport "+tmp[2]+time+" -j ACCEPT";
+    	system(command.c_str());
+    	cout<<command<<endl;
+    	command="sudo iptables -I FORWARD 1 -p udp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+time+" -j ACCEPT";
+    	cout<<command<<endl;
+    	system(command.c_str());
+    	}else if(tmp[1]=="tcp"){
+    	command="sudo iptables -I FORWARD 1 -p tcp -m mac --mac-source "+tmp[0]+" -m tcp --dport "+tmp[2]+time+" -j ACCEPT";
+    	cout<<command<<endl;
+    	system(command.c_str());
+    	command="sudo iptables -I FORWARD 1 -p tcp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+time+" -j ACCEPT";
+    	cout<<command<<endl;
+    	system(command.c_str());
+    	}else if(tmp[1]=="icmp"){
+    	command="sudo iptables -I FORWARD 1 icmp -m mac --mac-source "+tmp[0]+time+" -j ACCEPT";
+    	system(command.c_str());
+    	cout<<command<<endl;
+    	command="sudo iptables -I FORWARD 1 icmp -m state --state RELATED,ESTABLISHED"+time+" -j ACCEPT";
+    	system(command.c_str());
+    	cout<<command<<endl;
+    	}
+      
+        
+    }
+}
