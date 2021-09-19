@@ -32,6 +32,7 @@ char * textoenlace;
 char * textomodo;
 char * textoproto;
 char * textousuario;
+string archivocrontab;
 
 int counter;
 int id;
@@ -194,12 +195,13 @@ void modalidad1(){
     system("sudo insmod sch_htb 2> /dev/null");
     //crear raiz
     system("/usr/sbin/tc qdisc add dev enp7s0 root       handle 1:    htb default 0xA");
-    string archivocrontab="";
+    archivocrontab="";
     for(int i=0; i<usuario.size(); i++){
         vector<string>tmp=usuario[i];
         vector<string>mac=split(tmp[0],':',false);
         //crear enlaces id
-        string command="/usr/sbin/tc class add dev enp7s0 parent 1:1 classid 1:"+to_string(i+1);
+        int id=i+20;
+        string command="/usr/sbin/tc class add dev enp7s0 parent 1: classid 1:"+to_string(id);
         if(tmp.size()!=5){break; }
       
         
@@ -215,17 +217,21 @@ void modalidad1(){
         command=command+" htb rate "+to_string(intdefault)+"kbit ceil "+to_string(intdefault)+"kbit";
         
         //crear reglase del enlace
+        cout<<command<<endl;
         system(command.c_str());
         string M2= mac[4]+mac[5];
         string M0= mac[0]+mac[1];
         string M1= mac[2]+mac[3];
 	string TCF="/usr/sbin/tc filter add dev enp7s0 parent 1: protocol ip prio 5 u32 match u16 0x0800 0xFFFF at -2";
         string filter_by_mac1=TCF+" match u16 0x"+M2+" 0xFFFF at -4 match u32 0x"+M0+M1;
-        filter_by_mac1=filter_by_mac1+" 0xFFFFFFFF at -8 flowid 1:"+to_string(i+1);
+        filter_by_mac1=filter_by_mac1+" 0xFFFFFFFF at -8 flowid 1:"+to_string(id);
 
         string filter_by_mac2=TCF+" match u32 0x"+M1+M2+" 0xFFFFFFFF at -12 match u16 0x"+M0;
-        filter_by_mac2=filter_by_mac2+" 0xFFFF at -14 flowid 1:"+to_string(i+1);
+        filter_by_mac2=filter_by_mac2+" 0xFFFF at -14 flowid 1:"+to_string(id);
        //asignar por mac
+        cout<<filter_by_mac1<<endl;
+        cout<<filter_by_mac2<<endl;
+        
         system(filter_by_mac1.c_str());
         system(filter_by_mac2.c_str());
         ///////
@@ -233,15 +239,63 @@ void modalidad1(){
         cout<<"Hora inicio: "<<init[0]<<":"<<init[1];
         archivocrontab=archivocrontab+init[1]+" "+init[0]+" * * * /sbin/tc class change dev";
         if(isdinamic){
-        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdown)+"kbit \n";
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(id)+" htb rate "+to_string(intdown)+"kbit \n";
         }else{
-        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdown)+"kbit ceil "+to_string(intdown)+"kbit\n";
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(id)+" htb rate "+to_string(intdown)+"kbit ceil "+to_string(intdown)+"kbit\n";
         }
         
         vector<string> end=split(tmp[4],':',false);
         cout<<" Hora fin: "<<end[0]<<":"<<end[1]<<endl;
         archivocrontab=archivocrontab+end[1]+" "+end[0]+" * * * /sbin/tc class change dev";
-        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(i+1)+" htb rate "+to_string(intdefault)+"kbit ceil "+to_string(intdefault)+"kbit\n";
+        archivocrontab=archivocrontab+" enp7s0 parent 1:1 classid 1:"+to_string(id)+" htb rate "+to_string(intdefault)+"kbit ceil "+to_string(intdefault)+"kbit\n";
+        
+    }
+
+}
+
+void protocolos() {
+    
+    for(int i=0; i<proto.size(); i++){
+        vector<string>tmp=proto[i];
+        if(tmp.size()!=5){break; }
+    	string time=" -m time --timestart "+tmp[3]+" --timestop "+tmp[4]+"";
+    	vector<string> init=split(tmp[3],':',false);
+    	vector<string> end=split(tmp[4],':',false);
+    	string timeini=init[1]+" "+init[0]+" * * * ";
+    	string timeend=end[1]+" "+end[0]+" * * * ";
+    	
+        string command="";
+        
+        cout<<"Aplicando protocolo a "<<tmp[0]<<endl;
+    	if(tmp[1]=="udp"){
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p udp -m mac --mac-source "+tmp[0]+" -m udp --dport "+tmp[2]+" -j ACCEPT";
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	command=timeend+"/sbin/iptables -D FORWARD -p udp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	}else if(tmp[1]=="tcp"){
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p tcp -m mac --mac-source "+tmp[0]+" -m tcp --dport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	command=timeend+"/sbin/iptables -D FORWARD -p tcp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	}else if(tmp[1]=="icmp"){
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p icmp -m mac --mac-source "+tmp[0]+" -j ACCEPT";
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	command=timeend+"/sbin/iptables -D FORWARD -p icmp -m state --state RELATED,ESTABLISHED"+" -j ACCEPT";
+    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	}
+      
         
     }
     system("crontab /home/jhonny/Desktop/archivocontrab");
@@ -250,39 +304,4 @@ void modalidad1(){
     file << archivocrontab.c_str();
     file.close();
     system("sudo crontab -u root /home/jhonny/Desktop/archivocontrab");
-}
-
-void protocolos() {
-    for(int i=0; i<proto.size(); i++){
-        vector<string>tmp=proto[i];
-        
-    	if(tmp.size()!=5){break; }
-    	string time=" -m time --timestart "+tmp[3]+" --timestop "+tmp[4]+"";
-        string command="";
-        cout<<"Aplicando protocolo a "<<tmp[0]<<endl;
-    	if(tmp[1]=="udp"){
-    	command="sudo iptables -I FORWARD 1 -p udp -m mac --mac-source "+tmp[0]+" -m udp --dport "+tmp[2]+time+" -j ACCEPT";
-    	system(command.c_str());
-    	cout<<command<<endl;
-    	command="sudo iptables -I FORWARD 1 -p udp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+time+" -j ACCEPT";
-    	cout<<command<<endl;
-    	system(command.c_str());
-    	}else if(tmp[1]=="tcp"){
-    	command="sudo iptables -I FORWARD 1 -p tcp -m mac --mac-source "+tmp[0]+" -m tcp --dport "+tmp[2]+time+" -j ACCEPT";
-    	cout<<command<<endl;
-    	system(command.c_str());
-    	command="sudo iptables -I FORWARD 1 -p tcp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+time+" -j ACCEPT";
-    	cout<<command<<endl;
-    	system(command.c_str());
-    	}else if(tmp[1]=="icmp"){
-    	command="sudo iptables -I FORWARD 1 icmp -m mac --mac-source "+tmp[0]+time+" -j ACCEPT";
-    	system(command.c_str());
-    	cout<<command<<endl;
-    	command="sudo iptables -I FORWARD 1 icmp -m state --state RELATED,ESTABLISHED"+time+" -j ACCEPT";
-    	system(command.c_str());
-    	cout<<command<<endl;
-    	}
-      
-        
-    }
 }
