@@ -269,29 +269,47 @@ void protocolos() {
         cout<<"Aplicando protocolo a "<<tmp[0]<<endl;
     	if(tmp[1]=="udp"){
     	command=timeini+"/sbin/iptables -I FORWARD 1 -p udp -m mac --mac-source "+tmp[0]+" -m udp --dport "+tmp[2]+" -j ACCEPT";
-    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p udp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	archivocrontab=archivocrontab+command+"\n";
+//fin
+    	command=timeend+"/sbin/iptables -D FORWARD -p udp -m mac --mac-source "+tmp[0]+" -m udp --dport "+tmp[2]+" -j ACCEPT";
     	archivocrontab=archivocrontab+command+"\n";
     	cout<<command<<endl;
     	command=timeend+"/sbin/iptables -D FORWARD -p udp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+" -j ACCEPT";
     	cout<<command<<endl;
-    	//system(command.c_str());
     	archivocrontab=archivocrontab+command+"\n";
+    	
+    	
     	}else if(tmp[1]=="tcp"){
     	command=timeini+"/sbin/iptables -I FORWARD 1 -p tcp -m mac --mac-source "+tmp[0]+" -m tcp --dport "+tmp[2]+" -j ACCEPT";
     	cout<<command<<endl;
-    	//system(command.c_str());
     	archivocrontab=archivocrontab+command+"\n";
-    	command=timeend+"/sbin/iptables -D FORWARD -p tcp -m state --state RELATED,ESTABLISHED -m udp --sport "+tmp[2]+" -j ACCEPT";
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p tcp -m state --state RELATED,ESTABLISHED -m tcp --sport "+tmp[2]+" -j ACCEPT";
     	cout<<command<<endl;
-    	//system(command.c_str());
     	archivocrontab=archivocrontab+command+"\n";
+//fin
+    	command=timeend+"/sbin/iptables -D FORWARD -p tcp -m mac --mac-source "+tmp[0]+" -m tcp --dport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	archivocrontab=archivocrontab+command+"\n";
+    	command=timeend+"/sbin/iptables -D FORWARD -p tcp -m state --state RELATED,ESTABLISHED -m tcp --sport "+tmp[2]+" -j ACCEPT";
+    	cout<<command<<endl;
+    	archivocrontab=archivocrontab+command+"\n";
+    	    	
     	}else if(tmp[1]=="icmp"){
     	command=timeini+"/sbin/iptables -I FORWARD 1 -p icmp -m mac --mac-source "+tmp[0]+" -j ACCEPT";
-    	//system(command.c_str());
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	command=timeini+"/sbin/iptables -I FORWARD 1 -p icmp -m state --state RELATED,ESTABLISHED"+" -j ACCEPT";
+    	archivocrontab=archivocrontab+command+"\n";
+    	cout<<command<<endl;
+    	//fin
+    	command=timeend+"/sbin/iptables -D FORWARD -p icmp -m mac --mac-source "+tmp[0]+" -j ACCEPT";
     	archivocrontab=archivocrontab+command+"\n";
     	cout<<command<<endl;
     	command=timeend+"/sbin/iptables -D FORWARD -p icmp -m state --state RELATED,ESTABLISHED"+" -j ACCEPT";
-    	//system(command.c_str());
     	archivocrontab=archivocrontab+command+"\n";
     	cout<<command<<endl;
     	}
